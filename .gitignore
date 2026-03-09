@@ -3,3 +3,10 @@ __pycache__/
 env/
 *.pyc
 .claude/settings.local.json
+
+# Ignore data files but keep directory structures
+data/01_bronze_cricsheet/*.json
+data/02_silver_tables/*
+!data/02_silver_tables/.gitkeep
+data/03_gold_features/*
+!data/03_gold_features/.gitkeep

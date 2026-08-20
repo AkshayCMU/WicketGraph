@@ -1,0 +1,40 @@
+name: wicketgraph
+
+# Host ports are deliberately non-default: 8000/5173 are commonly taken by
+# other local projects. Override with API_PORT / UI_PORT if 8100/5273 clash too.
+# The container-internal ports never change, so nginx still proxies to api:8000.
+
+services:
+  api:
+    build:
+      context: .
+    image: wicketgraph-api:dev
+    container_name: wicketgraph-api
+    ports:
+      - "${API_PORT:-8100}:8000"
+    environment:
+      MODEL_PROVIDER: ${MODEL_PROVIDER:-openai}
+      MODEL_NAME: ${MODEL_NAME:-gpt-4o-mini}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=3).read()"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+
+  ui:
+    build:
+      context: ./frontend
+      args:
+        # Baked in at build time: Vite inlines import.meta.env at compile time,
+        # so this cannot be changed by a runtime environment variable.
+        VITE_API_BASE: ${VITE_API_BASE:-http://localhost:8100}
+    image: wicketgraph-ui:dev
+    container_name: wicketgraph-ui
+    depends_on:
+      api:
+        condition: service_healthy
+    ports:
+      - "${UI_PORT:-5273}:80"

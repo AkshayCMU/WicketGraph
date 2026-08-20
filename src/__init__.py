@@ -1,0 +1,1 @@
+"""WicketGraph package."""

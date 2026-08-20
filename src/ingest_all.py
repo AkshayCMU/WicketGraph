@@ -21,6 +21,7 @@ from typing import Optional, Protocol
 
 import pandas as pd
 
+from db import ensure_indexes
 from extractor import process_match
 
 # ---------------------------------------------------------------------------
@@ -178,6 +179,11 @@ def ingest_all(
     print()
     print(f"Done. {success} ingested, {skipped} skipped, {failed} failed.")
 
+    # Indexes are what make the analyzer layer usable (see db.SILVER_INDEXES).
+    # Idempotent, so this is safe on every run including no-op re-runs.
+    applied = ensure_indexes(conn)
+    print(f"Indexes ensured: {len(applied)} statements applied.")
+
     conn.close()
 
 
@@ -258,6 +264,23 @@ def verify(db_path: Path = SILVER_DB) -> None:
         print("  OK — all delivery match_ids exist in matches")
     else:
         print(f"  WARNING: {orphan_count} match_ids in deliveries not found in matches")
+        all_ok = False
+
+    # Index check — the analyzer layer is unusable without these.
+    print("\nIndex check (silver layer):")
+    existing = {
+        r[0] for r in conn.execute(
+            "SELECT name FROM sqlite_master WHERE type = 'index' AND name LIKE 'idx_%'"
+        ).fetchall()
+    }
+    expected = {"idx_deliveries_key", "idx_deliveries_batter", "idx_deliveries_bowler",
+                "idx_deliveries_match", "idx_extras_key", "idx_wickets_key",
+                "idx_wickets_player", "idx_innings_match", "idx_matches_id"}
+    missing = sorted(expected - existing)
+    if not missing:
+        print(f"  OK — all {len(expected)} analyzer indexes present")
+    else:
+        print(f"  WARNING: {len(missing)} missing: {', '.join(missing)}")
         all_ok = False
 
     # Failures list
